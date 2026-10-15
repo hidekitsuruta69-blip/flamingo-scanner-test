@@ -1,113 +1,3 @@
-
-過去のメッセージを読み込み中…
-ファイルが読み込めません
-
-10s考えました
-すみません。ファイル自体は確認できましたので、英数字のファイル名に変更して再用意しました。
-
-スキャナー v4｜1800px・1回読み取り版（全文TXT）
-
-683行・ファイル確認済み
-
-内容は前回のv4と同じです。1800px・1回読み取りで、品番抽出ルールは変更していません。
-
-もしこちらも開けなければ、GitHubの index.html の 145行目付近にある TARGET_WIDTH=1400 を TARGET_WIDTH=1800 に変更するだけで、v3からv4と同じ設定にできます。
-
-ファイルが読み込めません
-
-13s考えました
-すみません。今度は ZIP形式 で用意しました。
-
-1800px・1回読み取り版 v4（ZIP）
-
-ZIPの中に index.html が入っています。
-
-ただし、現在のv3が正常に動いているなら、ファイルをダウンロードしなくても変更できます。
-
-GitHubの index.html を開き、次の1か所だけ変更してください。
-
-変更前：
-
-const TARGET_WIDTH=1400;
-
-変更後：
-
-const TARGET_WIDTH=1800;
-
-これだけで 1800px・1回読み取り版 になります。
-
-品番の認識ルールやその他の機能は変更する必要がありません。
-
-まずは、この1か所の変更をおすすめします。
-
-過去のも含めてファイルが読み込めません
-過去のファイルもすべて読み込めないなら、コードの問題ではなく、ChatGPTのファイルダウンロード機能側で問題が起きている可能性があります。
-
-TXTもZIPも開けないとのことなので、これ以上ファイル形式を変えて試す必要はありません。
-
-今回の変更は、GitHub上で直接できます。
-
-GitHubの flamingo-scanner-test を開く
-
-index.html の鉛筆マークを押す
-
-Ctrl + F で TARGET_WIDTH を検索
-
-1400 を 1800 に変更
-
-Commit changes で保存
-
-これで現在のv3が1回読み取り版なら、希望どおりの 1800px・1回読み取り になります。
-
-なお、こちらでは過去に作成したTXT・ZIPファイルが存在することを確認できました。ただし、あなたの画面から正常に開けるかまでは確認できません。
-
-確認したいのは1点です。
-
-「ファイルが読み込めません」と表示されるのは、ChatGPTのダウンロードリンクをクリックした直後ですか？ それともダウンロードしたファイルを開くときですか？
-
-ここが分かれば原因を絞れます。
-
-
-1件の選択
-です
-了解です。ChatGPTのダウンロードリンクをクリックした直後に「ファイルが読み込めません」と表示されるのですね。
-
-それなら、TXTやZIPの形式ではなく、ChatGPT側のファイル取得処理に問題がある可能性が高いです。ただし、原因はまだ断定できません。
-
-まずはファイルを使わず、GitHubで直接変更しましょう。
-
-GitHubの index.html を編集画面で開く
-
-TARGET_WIDTH=1400 を検索する
-
-1400 を 1800 に変更する
-
-Commit changes で保存する
-
-これで、現在のコードが1回読み取り版なら、希望どおりの 1800px・1回読み取り になります。
-
-ダウンロードの問題については、ChatGPTのページを再読み込みして、新しいファイルリンクで試す方法があります。過去のリンクが復旧するとは限りません。
-
-ちなみに、ファイルが開けなくなったのは今日からですか？ それとも以前からでしょうか？
-
-うるせー。もう一度コード下さい。
-リアルタイムスキャナー v4｜1800px・1回読み取り版 コード全文
-
-OCR画像サイズ：1800px
-
-読み取り：1回で確定
-
-静止判定：約1秒
-
-品番抽出ルール：変更なし
-
-GitHubの index.html に全文貼り付け可能
-
-ファイルの存在は確認済みです。
-
-
-flamingo_realtime_OCR_1回読み取り_1800px_v4_index.txt
-ドキュメント
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -242,11 +132,11 @@ function checkMotion(){
   ctx.drawImage(video,0,0,w,h);const rgba=ctx.getImageData(0,0,w,h).data;const now=new Uint8Array(w*h);
   for(let i=0;i<now.length;i++)now[i]=(rgba[i*4]*3+rgba[i*4+1]*6+rgba[i*4+2])/10;
   let diff=0;if(lastMotion){for(let i=0;i<now.length;i+=3)diff+=Math.abs(now[i]-lastMotion[i]);diff/=Math.ceil(now.length/3);}lastMotion=now;
-  const moving=diff>11; // 手ぶれ・照明変動を含むため実機で調整する閾値
+  const moving=diff>16; // 手ぶれ・照明変動を含むため実機で調整する閾値
   if(moving){stableSince=0;motionVersion++;candidate='';candidateHits=0;if(!armed){armed=true;setState('次の品番を読み取り待機中');}return;}
   if(!armed)return;
   if(!stableSince){stableSince=Date.now();return;}
-  if(Date.now()-stableSince>=1000&&!ocrBusy)recognizeFrame();
+  if(Date.now()-stableSince>=300&&!ocrBusy)recognizeFrame();
 }
 function captureCrop(widthRatio,heightRatio){
   return new Promise((resolve,reject)=>{
