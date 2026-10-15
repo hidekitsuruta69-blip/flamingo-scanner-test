@@ -1,69 +1,673 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FLAMINGO カメラテスト</title>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="apple-touch-icon" href="https://www.flamingo-online.jp/feature/wp-content/uploads/2026/09/55400d81ed13e4127316d2b8b8bb89a1.png">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background: #f5f5f5;
-      padding: 20px;
-    }
-    h2 { margin-top: 30px; }
-    video {
-      width: 100%;
-      max-width: 500px;
-      background: #111;
-      border-radius: 12px;
-      margin-top: 20px;
-    }
-    button {
-      padding: 16px 25px;
-      font-size: 18px;
-      background: #111;
-      color: white;
-      border: none;
-      border-radius: 10px;
-    }
-    #status { margin-top: 20px; }
+    *{box-sizing:border-box} body{margin:0;background:#f5f5f5;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:14px}
+    .app{max-width:520px;margin:auto} h1{font-size:24px;margin:12px 0 4px}.sub{color:#777;font-size:13px;margin-bottom:14px}
+    .box{background:#fff;border-radius:16px;padding:14px;margin-bottom:13px} button{cursor:pointer;border:0;border-radius:12px;font-size:15px;font-weight:bold;padding:13px}
+    button:disabled{opacity:.45;cursor:default}.primary{background:#111;color:#fff;width:100%}.secondary{background:#eee;color:#111}.danger{background:#fff1f1;color:#b32222}
+    .cameraWrap{position:relative;overflow:hidden;background:#111;border-radius:12px;aspect-ratio:3/4;max-height:55vh}
+    video{width:100%;height:100%;object-fit:cover;display:block}.cameraWrap.hidden{display:none}
+    .frame{position:absolute;left:20%;top:32%;width:60%;height:36%;border:3px solid #00d26a;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.2);pointer-events:none}
+    .frame span{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#00d26a;color:#000;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:bold;white-space:nowrap}
+    #cameraHint{position:absolute;bottom:12px;left:10px;right:10px;background:rgba(0,0,0,.75);color:#fff;text-align:center;padding:9px;border-radius:9px;font-size:13px}
+    #result{font-size:24px;font-weight:800;text-align:center;overflow-wrap:anywhere;padding:10px 0} #state{font-size:13px;color:#555;text-align:center;min-height:20px}
+    .success{color:#087a40!important}.warning{color:#b26a00!important}.error{color:#b32222!important}
+    .controls{display:flex;gap:8px;margin-top:10px}.controls button{flex:1}.sectionTitle{font-size:16px;font-weight:800;margin:0 0 10px}
+    #history{max-height:235px;overflow-y:auto;overscroll-behavior:contain}.historyRow{display:flex;align-items:center;gap:6px;border-top:1px solid #eee;padding:8px 0}
+    .historyRow .code{font-size:14px;font-weight:bold;flex:1;overflow-wrap:anywhere}.mini{padding:8px 10px;font-size:12px}
+    .muted{color:#777;font-size:12px}.editing{border:2px solid #ffc36b;border-radius:10px;padding:10px;margin-top:8px}
+    input{width:100%;font-size:16px;padding:12px;border:1px solid #bbb;border-radius:9px;margin:8px 0}
+    #review{display:none}#reviewList .historyRow{padding:12px 0}#toast{font-size:13px;text-align:center;min-height:18px;margin-top:8px}
+    .note{font-size:12px;color:#777;line-height:1.6;margin-top:9px}#motionCanvas,#ocrCanvas{display:none}
   </style>
 </head>
 <body>
+<div class="app">
+  <h1>商品品番スキャン <small style="font-size:12px;color:#888">REALTIME TEST</small></h1>
+  <div class="sub">品番シールを中央の枠内で約1秒静止してください</div>
+  <div id="scanner">
+    <div class="box">
+      <div id="cameraWrap" class="cameraWrap hidden">
+        <video id="video" autoplay muted playsinline></video>
+        <div class="frame"><span>OCR優先範囲</span></div>
+        <div id="cameraHint">カメラを準備しています…</div>
+      </div>
+      <button id="startBtn" class="primary" type="button">📷 連続スキャンを開始</button>
+      <div class="controls" id="activeControls" style="display:none">
+        <button id="pauseBtn" class="secondary" type="button">一時停止</button>
+        <button id="stopBtn" class="primary" type="button">スキャン終了・全件確認</button>
+      </div>
+      <div id="result">まだ読み取っていません</div>
+      <div id="state">開始ボタンを押してください</div>
+      <div id="toast"></div>
+    </div>
+    <div class="box">
+      <div class="sectionTitle">読み取り履歴 <span id="count">0件</span></div>
+      <div id="history"><div class="muted">まだ履歴はありません</div></div>
+      <div id="editArea" style="display:none" class="editing">
+        <strong>品番を修正（OCR停止中）</strong>
+        <input id="editInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="品番を入力">
+        <div class="controls"><button id="cancelEdit" class="secondary" type="button">キャンセル</button><button id="saveEdit" class="primary" type="button">保存して再開</button></div>
+      </div>
+      <div class="note">履歴はこの端末に一時保存されます。スプレッドシートには最終確定後に登録します。</div>
+    </div>
+  </div>
+  <div id="review" class="box">
+    <div class="sectionTitle">全件確認 <span id="reviewCount"></span></div>
+    <div class="muted">品番を確認・修正してから登録してください。</div>
+    <div id="reviewList"></div>
+    <div id="reviewEdit" class="editing" style="display:none">
+      <strong>品番を修正</strong>
+      <input id="reviewInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <div class="controls"><button id="reviewCancel" class="secondary" type="button">キャンセル</button><button id="reviewSave" class="primary" type="button">保存</button></div>
+    </div>
+    <button id="commitBtn" class="primary" type="button" style="margin-top:14px">全件をTESTシートへ登録</button>
+    <div id="commitStatus" class="note"></div>
+    <div class="controls"><button id="backBtn" class="secondary" type="button">スキャン画面へ戻る</button><button id="clearBtn" class="danger" type="button">履歴を全件削除</button></div>
+  </div>
+</div>
+<canvas id="motionCanvas"></canvas><canvas id="ocrCanvas"></canvas>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const video=$('video'), motionCanvas=$('motionCanvas'), ocrCanvas=$('ocrCanvas');
+const STORAGE_KEY='flamingo_realtime_test_codes_v1';
+let codes=[],stream=null,worker=null,motionTimer=null,ocrBusy=false,scanning=false,paused=false,editingIndex=-1,reviewIndex=-1;
+let lastMotion=null,stableSince=0,motionVersion=0,armed=true,candidate='',candidateHits=0;
+let soundContext=null,hasStarted=false;
+try { const old=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); if(Array.isArray(old)) codes=old.filter(x=>typeof x==='string'&&isValidCode(x)); }catch(e){}
+function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(codes));}catch(e){}}
+function normalized(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,'');}
+function setState(message,kind=''){ $('state').textContent=message;$('state').className=kind; $('cameraHint').textContent=message; }
+function setResult(message,kind=''){ $('result').textContent=message;$('result').className=kind; }
+function toast(message,kind=''){ $('toast').textContent=message;$('toast').className=kind; }
+function beep(){try{if(!soundContext)soundContext=new (window.AudioContext||window.webkitAudioContext)();soundContext.resume();const osc=soundContext.createOscillator(),gain=soundContext.createGain();osc.type='sine';osc.frequency.value=960;gain.gain.setValueAtTime(.12,soundContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,soundContext.currentTime+.12);osc.connect(gain);gain.connect(soundContext.destination);osc.start();osc.stop(soundContext.currentTime+.13);}catch(e){}if(navigator.vibrate)navigator.vibrate(80);}
+function resetDetection(){candidate='';candidateHits=0;stableSince=0;lastMotion=null;motionVersion++;}
+function renderHistory(){
+  $('count').textContent=codes.length+'件';const area=$('history');const nearBottom=area.scrollHeight-area.scrollTop-area.clientHeight<65;
+  area.replaceChildren();if(!codes.length){area.innerHTML='<div class="muted">まだ履歴はありません</div>';return;}
+  codes.forEach((code,i)=>{const row=document.createElement('div');row.className='historyRow';const txt=document.createElement('div');txt.className='code';txt.textContent=(i+1)+'. '+code;const edit=document.createElement('button');edit.className='mini secondary';edit.textContent='修正';edit.onclick=()=>openEdit(i,false);const del=document.createElement('button');del.className='mini danger';del.textContent='削除';del.onclick=()=>deleteCode(i);row.append(txt,edit,del);area.append(row);});
+  if(nearBottom)area.scrollTop=area.scrollHeight;
+}
+function renderReview(){
+  $('reviewCount').textContent=codes.length+'件';const area=$('reviewList');area.replaceChildren();
+  if(!codes.length){area.innerHTML='<div class="muted">登録する品番がありません</div>';}
+  codes.forEach((code,i)=>{const row=document.createElement('div');row.className='historyRow';const txt=document.createElement('div');txt.className='code';txt.textContent=(i+1)+'. '+code;const edit=document.createElement('button');edit.className='mini secondary';edit.textContent='修正';edit.onclick=()=>openEdit(i,true);const del=document.createElement('button');del.className='mini danger';del.textContent='削除';del.onclick=()=>deleteCode(i);row.append(txt,edit,del);area.append(row);});
+  $('commitBtn').disabled=!codes.length;
+}
+function deleteCode(i){if(!confirm('「'+codes[i]+'」を削除しますか？'))return;codes.splice(i,1);persist();if(editingIndex!==-1)cancelEdit();renderHistory();renderReview();}
+function openEdit(i,review){
+  if(review){reviewIndex=i;$('reviewEdit').style.display='block';$('reviewInput').value=codes[i];$('reviewInput').focus();return;}
+  editingIndex=i;paused=true;resetDetection();$('editArea').style.display='block';$('editInput').value=codes[i];$('editInput').focus();setState('修正中：OCR一時停止','warning');$('pauseBtn').disabled=true;
+}
+function applyEdit(i,v){const value=normalized(v);if(!isValidCode(value)){alert('対応していない品番形式です');return false;}if(codes.some((x,j)=>j!==i&&x===value)){alert('この品番はすでに登録されています');return false;}codes[i]=value;persist();renderHistory();renderReview();return true;}
+function cancelEdit(){editingIndex=-1;$('editArea').style.display='none';$('pauseBtn').disabled=false;if(scanning){paused=false;armed=false;resetDetection();setState('カメラを動かして次のタグへ');}}
+$('saveEdit').onclick=()=>{if(editingIndex<0)return;if(applyEdit(editingIndex,$('editInput').value))cancelEdit();};
+$('cancelEdit').onclick=cancelEdit;
+$('reviewSave').onclick=()=>{if(reviewIndex<0)return;if(applyEdit(reviewIndex,$('reviewInput').value)){$('reviewEdit').style.display='none';reviewIndex=-1;}};
+$('reviewCancel').onclick=()=>{$('reviewEdit').style.display='none';reviewIndex=-1;};
+async function getWorker(){if(worker)return worker;setState('OCRを準備しています…');worker=await Tesseract.createWorker('eng',1,{logger:()=>{}});await worker.setParameters({tessedit_char_whitelist:'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});return worker;}
+async function startCamera(){
+  if(scanning)return;
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('このブラウザはカメラに対応していません');
+    soundContext=soundContext||new (window.AudioContext||window.webkitAudioContext)();soundContext.resume().catch(()=>{});
+    $('startBtn').disabled=true;setState('カメラを起動しています…');
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
+    video.srcObject=stream;await video.play();$('cameraWrap').classList.remove('hidden');
+    await getWorker();scanning=true;paused=false;armed=true;hasStarted=true;resetDetection();$('startBtn').style.display='none';$('activeControls').style.display='flex';setState('枠内に品番を合わせ、約1秒静止');
+    motionTimer=setInterval(checkMotion,180);
+  }catch(err){setState('起動エラー：'+(err.message||err),'error');stopCamera();$('startBtn').disabled=false;}
+}
+function stopCamera(){scanning=false;paused=false;clearInterval(motionTimer);motionTimer=null;resetDetection();if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;$('cameraWrap').classList.add('hidden');$('activeControls').style.display='none';$('startBtn').style.display='block';$('startBtn').disabled=false;}
+function checkMotion(){
+  if(!scanning||paused||video.readyState<2)return;
+  const w=64,h=48;motionCanvas.width=w;motionCanvas.height=h;const ctx=motionCanvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(video,0,0,w,h);const rgba=ctx.getImageData(0,0,w,h).data;const now=new Uint8Array(w*h);
+  for(let i=0;i<now.length;i++)now[i]=(rgba[i*4]*3+rgba[i*4+1]*6+rgba[i*4+2])/10;
+  let diff=0;if(lastMotion){for(let i=0;i<now.length;i+=3)diff+=Math.abs(now[i]-lastMotion[i]);diff/=Math.ceil(now.length/3);}lastMotion=now;
+  const moving=diff>11; // 手ぶれ・照明変動を含むため実機で調整する閾値
+  if(moving){stableSince=0;motionVersion++;candidate='';candidateHits=0;if(!armed){armed=true;setState('次の品番を読み取り待機中');}return;}
+  if(!armed)return;
+  if(!stableSince){stableSince=Date.now();return;}
+  if(Date.now()-stableSince>=1000&&!ocrBusy)recognizeFrame();
+}
+function captureCrop(widthRatio,heightRatio){
+  return new Promise((resolve,reject)=>{
+    const iw=video.videoWidth,ih=video.videoHeight;if(!iw||!ih){reject(new Error('カメラ映像がありません'));return;}
+    const cropW=iw*widthRatio,cropH=ih*heightRatio,cropX=(iw-cropW)/2,cropY=(ih-cropH)/2;
+    const TARGET_WIDTH=1800,scale=TARGET_WIDTH/cropW;
+    ocrCanvas.width=TARGET_WIDTH;ocrCanvas.height=Math.round(cropH*scale);
+    const ctx=ocrCanvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(video,cropX,cropY,cropW,cropH,0,0,ocrCanvas.width,ocrCanvas.height);
+    ocrCanvas.toBlob(blob=>blob?resolve(blob):reject(new Error('OCR画像生成失敗')),'image/jpeg',.95);
+  });
+}
+async function recognizeFrame(){
+  if(ocrBusy||!scanning||paused||!armed)return;ocrBusy=true;const version=motionVersion;
+  try{
+    setState('品番を認識中…');const w=await getWorker();
+    const tight=await captureCrop(.60,.36);const r1=await w.recognize(tight);let code=extractItemCode(r1.data.text||'');
+    if(!code){const wide=await captureCrop(.78,.58);const r2=await w.recognize(wide);code=extractItemCode((r1.data.text||'')+'\n'+(r2.data.text||''));}
+    if(!scanning||paused||version!==motionVersion||!armed)return;
+    if(!code){candidate='';candidateHits=0;setState('認識待機中：品番を枠内で静止');return;}
+    if(code===candidate)candidateHits++;else{candidate=code;candidateHits=1;}
+    if(candidateHits<2){setState('品番を再確認中…（'+candidateHits+'/2）');return;}
+    if(codes.includes(code)){setResult(code,'warning');setState('登録済み：次のタグへ移動してください','warning');}
+    else{codes.push(code);persist();renderHistory();setResult(code,'success');setState('読み取り成功 ✓ 次のタグへ移動してください','success');beep();}
+    armed=false;candidate='';candidateHits=0;
+  }catch(err){console.error(err);if(scanning&&!paused)setState('OCRエラー：'+(err.message||err),'error');}
+  finally{ocrBusy=false;}
+}
+$('startBtn').onclick=startCamera;
+$('pauseBtn').onclick=()=>{if(editingIndex!==-1)return;paused=!paused;resetDetection();if(paused){$('pauseBtn').textContent='再開';setState('OCR一時停止中','warning');}else{armed=false;$('pauseBtn').textContent='一時停止';setState('カメラを動かして次のタグへ');}};
+$('stopBtn').onclick=()=>{if(editingIndex!==-1){alert('修正を保存またはキャンセルしてください');return;}stopCamera();$('scanner').style.display='none';$('review').style.display='block';renderReview();};
+$('backBtn').onclick=()=>{$('review').style.display='none';$('scanner').style.display='block';$('reviewEdit').style.display='none';reviewIndex=-1;setState('開始ボタンを押してスキャンを再開');};
+$('clearBtn').onclick=()=>{if(!codes.length)return;if(!confirm('読み取り履歴をすべて削除しますか？'))return;codes=[];persist();renderHistory();renderReview();$('commitStatus').textContent='履歴を削除しました';};
+$('commitBtn').onclick=()=>{
+  if(!codes.length)return;
+  if(typeof google==='undefined'||!google.script||!google.script.run){$('commitStatus').textContent='GAS上で開いてください';return;}
+  if(!confirm(codes.length+'件をTEST用スプレッドシートへ登録しますか？'))return;
+  $('commitBtn').disabled=true;$('commitStatus').textContent='TESTシートへ登録中…';
+  const sending=codes.slice();
+  google.script.run.withSuccessHandler(result=>{
+    // 一括登録が全件成功した場合だけ端末履歴を消去する
+    if(!result||result.success!==true||result.count!==sending.length){$('commitStatus').textContent='登録結果を確認できません。シートを確認してから再操作してください。';$('commitBtn').disabled=false;return;}
+    codes=[];persist();renderHistory();renderReview();$('commitStatus').textContent=result.count+'件を登録しました ✓';
+  }).withFailureHandler(err=>{$('commitStatus').textContent='登録エラー：'+(err.message||err);$('commitBtn').disabled=false;}).saveItemCodesBatch(sending);
+};
+window.addEventListener('pagehide',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
+renderHistory();
 
-  <h2>FLAMINGO カメラテスト</h2>
+/* ===== ここから既存の品番補正・抽出・形式確認ロジック（原文のまま） ===== */
+function fixDigits(value) {
 
-  <button id="startBtn">カメラを起動</button>
 
-  <div id="status">待機中</div>
+  return String(value)
 
-  <video id="camera" autoplay playsinline muted></video>
+    .toLowerCase()
 
-  <script>
-    document.getElementById('startBtn').onclick = async function() {
-      const status = document.getElementById('status');
-      const video = document.getElementById('camera');
+    /*
+     * 数字としてよく間違える文字
+     */
 
-      try {
-        status.textContent = 'カメラ起動中...';
+    .replace(/o/g, '0')
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: 'environment' }
-        });
+    .replace(/[il|]/g, '1')
 
-        video.srcObject = stream;
-        await video.play();
+    .replace(/s/g, '5')
 
-        status.textContent = 'カメラ起動成功！';
+    .replace(/b/g, '8')
 
-      } catch (error) {
-        status.textContent = 'エラー：' + error.message;
+    .replace(/z/g, '2');
+
+}
+
+
+
+/*
+ * =============================================
+ * 品番抽出
+ * =============================================
+ */
+
+function extractItemCode(text) {
+
+  if (!text) {
+    return null;
+  }
+
+  const lower = text.toLowerCase();
+
+
+  /*
+   * ==========================================
+   * OCR結果を行ごとに整理
+   * ==========================================
+   */
+
+  const lines = lower
+    .split(/\n/)
+    .map(line =>
+      line
+        .replace(/[^a-z0-9]/g, '')
+    )
+    .filter(Boolean);
+
+
+  /*
+   * ==========================================
+   * ① m系
+   *
+   * m20261012
+   * m077
+   *
+   * OCR例：
+   *
+   * Agm20261012
+   * KRm0077
+   *
+   * でも拾う
+   * ==========================================
+   */
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+
+    const line =
+      lines[i];
+
+
+    /*
+     * 行の途中でも
+     * m + 8桁を探す
+     */
+
+    const firstMatch =
+      line.match(
+        /m([0-9oilsbz|]{8})/
+      );
+
+
+    if (!firstMatch) {
+      continue;
+    }
+
+
+    /*
+     * 日付部分を数字補正
+     */
+
+    const date =
+      fixDigits(
+        firstMatch[1]
+      );
+
+
+    if (!/^\d{8}$/.test(date)) {
+      continue;
+    }
+
+
+    /*
+     * 次の数行から
+     * m + 番号を探す
+     */
+
+    for (
+      let j = i + 1;
+      j <= i + 4 &&
+      j < lines.length;
+      j++
+    ) {
+
+      const secondLine =
+        lines[j];
+
+
+      /*
+       * 行の途中にあってもOK
+       *
+       * KRm0077
+       * ↓
+       * m0077
+       */
+
+      const secondMatch =
+        secondLine.match(
+          /m([0-9oilsbz|]{3,6})/
+        );
+
+
+      if (!secondMatch) {
+        continue;
       }
-    };
-  </script>
 
+
+      const number =
+        fixDigits(
+          secondMatch[1]
+        )
+        .replace(/\D/g, '');
+
+
+      if (
+        number.length >= 3
+      ) {
+
+        /*
+         * m0077
+         * ↓
+         * 0077
+         * ↓
+         * 077
+         */
+
+        return (
+          'm' +
+          date +
+          'm' +
+          number.slice(-3)
+        );
+
+      }
+
+    }
+
+  }
+
+
+
+  /*
+   * ==========================================
+   * ② k系
+   *
+   * k20260238
+   * k017
+   *
+   * ↓
+   *
+   * k20260238k017
+   * ==========================================
+   */
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+
+    const line =
+      lines[i];
+
+
+    const firstMatch =
+      line.match(
+        /k([0-9oilsbz|]{8})/
+      );
+
+
+    if (!firstMatch) {
+      continue;
+    }
+
+
+    const date =
+      fixDigits(
+        firstMatch[1]
+      );
+
+
+    if (!/^\d{8}$/.test(date)) {
+      continue;
+    }
+
+
+    for (
+      let j = i + 1;
+      j <= i + 4 &&
+      j < lines.length;
+      j++
+    ) {
+
+      const secondLine =
+        lines[j];
+
+
+      const secondMatch =
+        secondLine.match(
+          /k([0-9oilsbz|]{3,6})/
+        );
+
+
+      if (!secondMatch) {
+        continue;
+      }
+
+
+      const number =
+        fixDigits(
+          secondMatch[1]
+        )
+        .replace(/\D/g, '');
+
+
+      if (
+        number.length >= 3
+      ) {
+
+        return (
+          'k' +
+          date +
+          'k' +
+          number.slice(-3)
+        );
+
+      }
+
+    }
+
+  }
+
+
+
+  /*
+   * ==========================================
+   * ③ ACS系
+   *
+   * 20250220
+   * acs025
+   * ==========================================
+   */
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+
+    /*
+     * 行の中から8桁を探す
+     */
+
+    const fixedLine =
+      fixDigits(
+        lines[i]
+      );
+
+
+    const dateMatch =
+      fixedLine.match(
+        /\d{8}/
+      );
+
+
+    if (!dateMatch) {
+      continue;
+    }
+
+
+    const date =
+      dateMatch[0];
+
+
+    for (
+      let j = i + 1;
+      j <= i + 4 &&
+      j < lines.length;
+      j++
+    ) {
+
+      const second =
+        lines[j];
+
+
+      /*
+       * ACS
+       */
+
+      const acsMatch =
+        second.match(
+          /acs([0-9oilsbz|]{3,6})/
+        );
+
+
+      if (acsMatch) {
+
+        const number =
+          fixDigits(
+            acsMatch[1]
+          )
+          .replace(/\D/g, '');
+
+
+        if (
+          number.length >= 3
+        ) {
+
+          return (
+            date +
+            'acs' +
+            number.slice(-3)
+          );
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+
+  /*
+   * ==========================================
+   * ④ a系
+   *
+   * 20260227
+   * a016
+   * ==========================================
+   */
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+
+    const fixedLine =
+      fixDigits(
+        lines[i]
+      );
+
+
+    const dateMatch =
+      fixedLine.match(
+        /\d{8}/
+      );
+
+
+    if (!dateMatch) {
+      continue;
+    }
+
+
+    const date =
+      dateMatch[0];
+
+
+    for (
+      let j = i + 1;
+      j <= i + 4 &&
+      j < lines.length;
+      j++
+    ) {
+
+      const second =
+        lines[j];
+
+
+      const aMatch =
+        second.match(
+          /a([0-9oilsbz|]{3,6})/
+        );
+
+
+      if (!aMatch) {
+        continue;
+      }
+
+
+      const number =
+        fixDigits(
+          aMatch[1]
+        )
+        .replace(/\D/g, '');
+
+
+      if (
+        number.length >= 3
+      ) {
+
+        return (
+          date +
+          'a' +
+          number.slice(-3)
+        );
+
+      }
+
+    }
+
+  }
+
+
+  return null;
+
+}
+
+/*
+ * =============================================
+ * 品番形式確認
+ * =============================================
+ */
+
+function isValidCode(code) {
+
+  return (
+
+    /^m\d{8}m\d{3}$/.test(code)
+
+    ||
+
+    /^k\d{8}k\d{3}$/.test(code)
+
+    ||
+
+    /^\d{8}a\d{3}$/.test(code)
+
+    ||
+
+    /^\d{8}acs\d{3}$/.test(code)
+
+  );
+
+}
+
+
+
+
+/* ===== 既存ロジックここまで ===== */
+</script>
 </body>
 </html>
