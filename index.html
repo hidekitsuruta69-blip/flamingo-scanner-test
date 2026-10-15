@@ -57,19 +57,19 @@
         <input id="editInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="品番を入力">
         <div class="controls"><button id="cancelEdit" class="secondary" type="button">キャンセル</button><button id="saveEdit" class="primary" type="button">保存して再開</button></div>
       </div>
-      <div class="note">履歴はこの端末に一時保存されます。今回のOCRテストではスプレッドシートに送信しません。</div>
+      <div class="note">履歴はこの端末に一時保存されます。送信前に品番を確認してください。送信後はTEST版ロケーション管理表で登録結果を確認してください。</div>
     </div>
   </div>
   <div id="review" class="box">
     <div class="sectionTitle">全件確認 <span id="reviewCount"></span></div>
-    <div class="muted">品番を確認・修正できます。スプレッドシート登録は次の段階で実装します。</div>
+    <div class="muted">品番を確認・修正してから、TEST版スキャナーの登録確認画面へ進みます。</div>
     <div id="reviewList"></div>
     <div id="reviewEdit" class="editing" style="display:none">
       <strong>品番を修正</strong>
       <input id="reviewInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false">
       <div class="controls"><button id="reviewCancel" class="secondary" type="button">キャンセル</button><button id="reviewSave" class="primary" type="button">保存</button></div>
     </div>
-    <button id="commitBtn" class="primary" type="button" disabled style="margin-top:14px">TESTシートへの登録（次の段階で有効化）</button>
+    <button id="commitBtn" class="primary" type="button" style="margin-top:14px">TEST版ロケーション管理表へ送信</button>
     <div id="commitStatus" class="note"></div>
     <div class="controls"><button id="backBtn" class="secondary" type="button">スキャン画面へ戻る</button><button id="clearBtn" class="danger" type="button">履歴を全件削除</button></div>
   </div>
@@ -101,7 +101,7 @@ function renderReview(){
   $('reviewCount').textContent=codes.length+'件';const area=$('reviewList');area.replaceChildren();
   if(!codes.length){area.innerHTML='<div class="muted">登録する品番がありません</div>';}
   codes.forEach((code,i)=>{const row=document.createElement('div');row.className='historyRow';const txt=document.createElement('div');txt.className='code';txt.textContent=(i+1)+'. '+code;const edit=document.createElement('button');edit.className='mini secondary';edit.textContent='修正';edit.onclick=()=>openEdit(i,true);const del=document.createElement('button');del.className='mini danger';del.textContent='削除';del.onclick=()=>deleteCode(i);row.append(txt,edit,del);area.append(row);});
-  $('commitBtn').disabled=true;
+  $('commitBtn').disabled=codes.length===0;
 }
 function deleteCode(i){if(!confirm('「'+codes[i]+'」を削除しますか？'))return;codes.splice(i,1);persist();if(editingIndex!==-1)cancelEdit();renderHistory();renderReview();}
 function openEdit(i,review){
@@ -207,7 +207,24 @@ $('rescanBtn').onclick=()=>{
 $('stopBtn').onclick=()=>{if(editingIndex!==-1){alert('修正を保存またはキャンセルしてください');return;}stopCamera();$('scanner').style.display='none';$('review').style.display='block';renderReview();};
 $('backBtn').onclick=()=>{$('review').style.display='none';$('scanner').style.display='block';$('reviewEdit').style.display='none';reviewIndex=-1;setState('開始ボタンを押してスキャンを再開');};
 $('clearBtn').onclick=()=>{if(!codes.length)return;if(!confirm('読み取り履歴をすべて削除しますか？'))return;codes=[];persist();renderHistory();renderReview();$('commitStatus').textContent='履歴を削除しました';};
-$('commitBtn').onclick=()=>{ alert('現在はOCRテスト専用です。スプレッドシートへの送信は行いません。'); };
+// TEST版スキャナー（GAS）の登録確認画面に品番を引き渡す。
+// ここではまだ登録しない。登録はGoogleログイン後、GAS画面で確定する。
+const TEST_RECEIVE_URL='https://script.google.com/macros/s/AKfycbwX1LlMcR7pVb8SG626T3d69JJbwJ0zQbbuLK46eYJ-lQhy4B4zIIXMJq1L49yo9vnDgg/exec';
+$('commitBtn').onclick=()=>{
+  if(!codes.length){alert('送信する品番がありません。');return;}
+  if(reviewIndex!==-1){alert('品番の修正を保存またはキャンセルしてください。');return;}
+  if(codes.length>60){
+    $('commitStatus').textContent='一度に送れる品番は60件までです。履歴を確認して分けて送信してください。';
+    return;
+  }
+  const params=new URLSearchParams();
+  params.set('mode','receive');
+  params.set('codes',codes.join(','));
+  const dest=TEST_RECEIVE_URL+'?'+params.toString();
+  $('commitStatus').textContent='TEST版スキャナーの登録確認画面を開きます。登録完了までは履歴を削除しないでください。';
+  // iPhone Safariでもユーザー操作から直接画面遷移する。
+  window.location.assign(dest);
+};
 
 window.addEventListener('pagehide',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
 renderHistory();
@@ -698,5 +715,3 @@ function isValidCode(code) {
 </script>
 </body>
 </html>
-
-
