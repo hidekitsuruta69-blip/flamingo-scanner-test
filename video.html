@@ -30,7 +30,7 @@
 </head>
 <body>
 <div class="app">
-  <h1>商品品番スキャン <small style="font-size:12px;color:#888">REALTIME TEST</small></h1>
+  <h1>商品品番スキャン <small style="font-size:12px;color:#888"></small></h1>
   <div class="sub">品番シールを中央の枠内で約0.3秒静止してください</div>
   <div id="scanner">
     <div class="box">
@@ -57,19 +57,19 @@
         <input id="editInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="品番を入力">
         <div class="controls"><button id="cancelEdit" class="secondary" type="button">キャンセル</button><button id="saveEdit" class="primary" type="button">保存して再開</button></div>
       </div>
-      <div class="note">履歴はこの端末に一時保存されます。送信前に品番を確認してください。送信後はTEST版ロケーション管理表で登録結果を確認してください。</div>
+      <div class="note">履歴はこの端末に一時保存されます。送信前に品番を確認してください。送信後はロケーション管理表で登録結果を確認してください。</div>
     </div>
   </div>
   <div id="review" class="box">
     <div class="sectionTitle">全件確認 <span id="reviewCount"></span></div>
-    <div class="muted">品番を確認・修正してから、TEST版スキャナーの登録確認画面へ進みます。</div>
+    <div class="muted">品番を確認・修正してから、スキャナーの登録確認画面へ進みます。</div>
     <div id="reviewList"></div>
     <div id="reviewEdit" class="editing" style="display:none">
       <strong>品番を修正</strong>
       <input id="reviewInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false">
       <div class="controls"><button id="reviewCancel" class="secondary" type="button">キャンセル</button><button id="reviewSave" class="primary" type="button">保存</button></div>
     </div>
-    <button id="commitBtn" class="primary" type="button" style="margin-top:14px">TEST版ロケーション管理表へ送信</button>
+    <button id="commitBtn" class="primary" type="button" style="margin-top:14px">ロケーション管理表へ送信</button>
     <div id="commitStatus" class="note"></div>
     <div class="controls"><button id="backBtn" class="secondary" type="button">スキャン画面へ戻る</button><button id="clearBtn" class="danger" type="button">履歴を全件削除</button></div>
   </div>
@@ -221,7 +221,7 @@ $('commitBtn').onclick=()=>{
   params.set('mode','receive');
   params.set('codes',codes.join(','));
   const dest=TEST_RECEIVE_URL+'?'+params.toString();
-  $('commitStatus').textContent='TEST版スキャナーの登録確認画面を開きます。登録完了までは履歴を削除しないでください。';
+  $('commitStatus').textContent='スキャナーの登録確認画面を開きます。登録完了までは履歴を削除しないでください。';
   // iPhone Safariでもユーザー操作から直接画面遷移する。
   window.location.assign(dest);
 };
