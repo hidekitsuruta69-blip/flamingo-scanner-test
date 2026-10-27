@@ -207,7 +207,7 @@ $('rescanBtn').onclick=()=>{
 $('stopBtn').onclick=()=>{if(editingIndex!==-1){alert('修正を保存またはキャンセルしてください');return;}stopCamera();$('scanner').style.display='none';$('review').style.display='block';renderReview();};
 $('backBtn').onclick=()=>{$('review').style.display='none';$('scanner').style.display='block';$('reviewEdit').style.display='none';reviewIndex=-1;setState('開始ボタンを押してスキャンを再開');};
 $('clearBtn').onclick=()=>{if(!codes.length)return;if(!confirm('読み取り履歴をすべて削除しますか？'))return;codes=[];persist();renderHistory();renderReview();$('commitStatus').textContent='履歴を削除しました';};
-// TEST版スキャナー（GAS）の登録確認画面に品番を引き渡す。
+// スキャナー（GAS）の登録確認画面に品番を引き渡す。
 // ここではまだ登録しない。登録はGoogleログイン後、GAS画面で確定する。
 const TEST_RECEIVE_URL='https://script.google.com/macros/s/AKfycbwX1LlMcR7pVb8SG626T3d69JJbwJ0zQbbuLK46eYJ-lQhy4B4zIIXMJq1L49yo9vnDgg/exec';
 $('commitBtn').onclick=()=>{
